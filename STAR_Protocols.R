@@ -1,7 +1,3 @@
-#tmp
-rm(list=ls())
-setwd("/Users/feiji/projects/STAR_RT/tmp/RTI_Epigenome")
-
 #' Load required packages 
 library(preprocessCore)
 library(runner)
