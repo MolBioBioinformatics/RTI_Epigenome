@@ -5,6 +5,7 @@ library(tidyverse)
 library(randomForest)
 library(bedtoolsr)
 library(ComplexHeatmap)
+library(dplyr)
 library(circlize)
 
 #' ### Replication Timing (RT) data QC 
