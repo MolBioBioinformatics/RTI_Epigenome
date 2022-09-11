@@ -1,3 +1,7 @@
+#tmp
+rm(list=ls())
+setwd("/Users/feiji/projects/STAR_RT/tmp/RTI_Epigenome")
+
 #' Load required packages 
 library(preprocessCore)
 library(runner)
@@ -5,9 +9,11 @@ library(tidyverse)
 library(randomForest)
 library(bedtoolsr)
 library(ComplexHeatmap)
+library(circlize)
 
-#' ## Replication Timing (RT) data QC 
-#' Load Replication Timing (RT) genomic bin coverage
+#' ### Replication Timing (RT) data QC 
+#' Load Replication Timing (RT) genomic bin coverage.
+#' RT_rawCount.txt counted 
 tab <- read.table("dat/RT_rawCount.txt", header=TRUE)
 colnames(tab) <- gsub(".bam","",colnames(tab))
 rownames(tab) <- paste("bin",1:dim(tab)[1],sep="")
@@ -35,7 +41,7 @@ pca <- prcomp(t(log10(RT.bin.cpm+0.01)))
 plot(pca$x[,1],pca$x[,2],type="n",xlab="PC1",ylab="PC2",xlim=c(-200,200))
 text(pca$x[,1],pca$x[,2],rownames(pca$x))
 
-#' ## Repli-seq data quantile normalization and LOESS smoothing
+#' ### Repli-seq data quantile normalization and LOESS smoothing
 #' Genome wide quantile normalization and LOESS smoothing
 qn <- function(inp){
   out <- normalize.quantiles(inp)
@@ -61,8 +67,7 @@ for(i in 1:dim(RT.bin.norm)[2]){
     RT.bin.loess[idx,i] <- Rpla$fitted
   }
 }
-
-RT.bin.loess[RT.bin.loess <0]=0
+RT.bin.loess[RT.bin.loess<0]=0
 
 #' Example of RT coverage before and after pre-processing.
 idx <- bin.bed %>% filter(chr=="chr1" & start>10e6 & end<15e6) %>% rownames()
@@ -70,8 +75,66 @@ plot(bin_crd[idx]/1e6,RT.bin.cpm[idx,"RPE.ct1.S1"],type="l",col="grey",xlab="Coo
 lines(bin_crd[idx]/1e6,RT.bin.loess[idx,"RPE.ct1.S1"],col="red")
 legend(x="topright",col=c("grey","red"),lty=1,legend = c("raw CPM","LOESS CPM"))
 
+#' QC and quantile normalization steps can be applied to ChIP-seq coverage over same genomic bins.
 
-#' ## Calculate Replication Timing Index (RTI) and RTI change
+#' ### Sub-clustering genomic regions with the same chromatin state by their replication timing
+#' Chromatin states were learn using ChromHMM from combination of histone marks.
+#' To understand the general replication behavior of regions under specific
+#' chromatin states, it is informative to define and analyze subgroups of
+#' regions sharing similar replication timing within each chromatin state.
+
+chromHMM.bed <- read.table("dat/broad.chromatin.state.bed",sep="\t")[,1:4]
+colnames(chromHMM.bed) <- c("chr","start","end","state")
+
+target.state <- "act"
+target.state.bins <- bedtoolsr::bt.intersect(bin.bed,chromHMM.bed[chromHMM.bed$state==target.state,],wa=T)[,4]
+state.RT <- log10(RT.bin.norm[target.state.bins,c("RPE.ct1.S1","RPE.ct1.S2","RPE.ct1.S3","RPE.ct1.S4")]+0.1)
+km <- kmeans(state.RT,3)
+
+ComplexHeatmap::Heatmap(state.RT,
+                        use_raster=TRUE,
+                        col=c("white","grey10"),
+                        show_row_names = FALSE,
+                        show_column_names = T,
+                        show_row_dend = FALSE,
+                        cluster_columns=FALSE,
+                        cluster_rows = F,
+                        split = km$cluster,
+                        column_labels = c("S1","S2","S3","S4"),
+                        cluster_row_slices=T,
+                        name='log10(RPE)')
+#' Using cell cycle H3K36me3 ChIP-seq coverage as an example to investigate
+#' above histone modification temporal dynamics at each time point (G1, ES, LS,
+#' G2/M) through cell cycle.
+#' 
+#' Load H3K36me3 and Input ChIP-seq genomic coverage were normalized as shown before
+H3K36me3.bin.cpm <- read.table("dat/H3K36me3.qn.txt",header=T,check.names = F)
+Input.bin.cpm <- read.table("dat/Input.qn.txt",header=T,check.names = F)
+
+#' Calculate log2 ChIP over Input enrichment
+pseudo=0.1
+H3K36me3.bin.enrich <- log2(H3K36me3.bin.cpm+pseudo)-log2(Input.bin.cpm+pseudo)
+rownames(H3K36me3.bin.enrich) <- rownames(bin.bed)
+H3K36me3.ctrl.enrich <- (H3K36me3.bin.enrich[,c("ct1-G1-K36me3","ct1-ES-K36me3","ct1-LS-K36me3","ct1-G2-K36me3")]+
+                             H3K36me3.bin.enrich[,c("ct2-G1-K36me3","ct2-ES-K36me3","ct2-LS-K36me3","ct2-G2-K36me3")])/2
+
+#' Calculate enrichment dynamic through cell cycle
+H3K36me3.cycle <- H3K36me3.ctrl.enrich-rowMeans(H3K36me3.ctrl.enrich)
+
+#' Visualize H3K36me3 cell cycle dynamic in each chromatin subset defined by RT above
+col <- colorRampPalette(c("purple","black","yellow"))
+ComplexHeatmap::Heatmap(H3K36me3.cycle[target.state.bins,] %>% as.matrix(),
+                        use_raster=TRUE,
+                        show_row_names = FALSE,
+                        show_column_names = FALSE,
+                        show_row_dend = FALSE,
+                        cluster_columns=FALSE,
+                        cluster_rows=FALSE,
+                        col=colorRamp2(seq(-0.4,0.4,length.out=100), col(100)),
+                        split = km$cluster)
+
+
+#' ### Calculate Replication Timing Index (RTI) and RTI change
 #' Calculate RTI based on Repli-seq data at multiple time points across cell
 #' cycle in all samples (2 replicates of control cells and 2 replicates of
 #' over-expression cells)
@@ -110,35 +173,15 @@ axis(2,0:1,1:0,las=2)
 lines(bin_crd[idx]/1e6,1-RTI.oe[idx],col="red")
 legend(x="topright",col=c("black","red"),lty=1,legend = c("Control","Over-Expression"))
 
-#' Write differential RT regions to a bed file.
+#' Output differential RT regions to a bed file.
 RTI.diff.bins <- bin.bed[RTI.diff %>% filter(abs(diff)>0.05 & P.value<0.01) %>% select(binID) %>% as.matrix(),]
 write.table(bedtoolsr::bt.merge(RTI.diff.bins[order(RTI.diff.bins$chr,RTI.diff.bins$start),]),
             "sample_output/diff.RT.bed",
             quote=F,row.names = F,col.names = F,sep="\t")
 
-#' ## Sub-clustering genomic regions with the same chromatin state by their replication timing
-chromHMM.bed <- read.table("dat/broad.chromatin.state.bed",sep="\t")[,1:4]
-colnames(chromHMM.bed) <- c("chr","start","end","state")
 
-target.state <- "act"
-target.state.bins <- bedtoolsr::bt.intersect(bin.bed,chromHMM.bed[chromHMM.bed$state==target.state,],wa=T)[,4]
-state.RT <- log10(RT.bin.norm[target.state.bins,c("RPE.ct1.S1","RPE.ct1.S2","RPE.ct1.S3","RPE.ct1.S4")]+0.1)
-km <- kmeans(state.RT,3)
-
-ComplexHeatmap::Heatmap(state.RT,
-                        use_raster=TRUE,
-                        col=c("white","grey10"),
-                        show_row_names = FALSE,
-                        show_column_names = T,
-                        show_row_dend = FALSE,
-                        cluster_columns=FALSE,
-                        cluster_rows = F,
-                        split = km$cluster,
-                        column_labels = c("S1","S2","S3","S4"),
-                        cluster_row_slices=T,
-                        name='log10(RPE)')
-
-#' ## Train and evaluate computational models to predict RTI and RTI change from the combination of epigenomic and transcriptomic data
+#' ### Train and evaluate computational models to predict RTI from the
+#' combination of epigenomic and transcriptomic data
 tab.Ctrl.Broad <- as.matrix(read.table("dat/bin.Ctrl.enrich.tab",header=T)[,-(1:3)]) # Input normalized log2 enrichment of all broad histone marks in each 50Kb bin
 tab.sync.Ctrl.Broad <- as.matrix(read.table("dat/bin.sync.ctrl.enrich.tab",header=T)[,-(1:3)]) # Input normalized log2 enrichment of all broad histone marks across cell cycle
 
@@ -146,7 +189,6 @@ tab.deltaBroad <- as.matrix(read.table("dat/bin.diff.broad.tab",header=T)[,-(1:3
 tab.sync.deltaBroad <- as.matrix(read.table("dat/bin.diff.broad.cycle.tab",header=T)[,-(1:3)]) # difference log2 enrichment between Ctrl and KDM4A-OE of all broad histone marks in each 50Kb bin across cell cycle
 tab.diffPeak <- as.matrix(read.table("dat/bin.diff.peak.cnt.tab",header=T)[,-(1:3)]) # number of differential peaks between Ctrl and KDM4A-OE in each 50Kb bin
 
-#' #### Train and predict RTI 
 #' Split training and testing sets
 rand.chr.list <- sample(unique(bin.bed[,1]))
 inp_idx <- c()
@@ -173,7 +215,8 @@ pred <- predict(fit, newdata = dat_tst)
 plot(dat_tst$RT, pred, ylab = "Predicted", xlab = "Observed",
      col=densCols(pred, dat_tst$RT),cex=0.5,pch=16,main="RTI")
 
-#' #### Train and predict RTI change
+#' ### Train and evaluate computational models to predict RTI change
+#' from the combination of epigenomic and transcriptomic data
 dat <- data.frame(diffRT=RTI.diff$diff, tab.sync.deltaBroad,tab.diffPeak)
 dat_trn = dat[-inp_idx,] %>% filter(!is.na(diffRT))# Training 
 dat_tst = dat[inp_idx,] %>% filter(!is.na(diffRT))# Test
@@ -192,7 +235,7 @@ plot(dat_tst$diffRT, pred, ylab = "Predicted", xlab = "Observed",
      col=densCols(pred, dat_tst$diffRT),
      cex=0.5,pch=16,main="OE vs Control RTI change")
 
-#' ## Define genomic regions with specific types of local replication patterns
+#' ### Define genomic regions with specific types of local replication patterns
 #' Using genome-wide RTI values calculated at the previous step, define genomic
 #' locations of initiation zones, termination sites, constant timing regions.
 w <- 10
