@@ -11,7 +11,8 @@ library(circlize)
 #' ### Replication Timing (RT) data QC 
 #' Load Replication Timing (RT) genomic bin coverage.
 #' RT_rawCount.txt counted 
-tab <- read.table("dat/RT_rawCount.txt", header=TRUE)
+# tab <- read.table("dat/RT_rawCount.txt", header=TRUE) # read text file
+tab <- read.table(gzfile("dat/RT_rawCount.txt.gz"), header=TRUE) # read .gz
 colnames(tab) <- gsub(".bam","",colnames(tab))
 rownames(tab) <- paste("bin",1:dim(tab)[1],sep="")
 
