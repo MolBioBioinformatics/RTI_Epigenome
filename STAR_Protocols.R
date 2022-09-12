@@ -85,9 +85,11 @@ legend(x="topright",col=c("grey","red"),lty=1,legend = c("raw CPM","LOESS CPM"))
 #' chromatin states, it is informative to define and analyze subgroups of
 #' regions sharing similar replication timing within each chromatin state.
 
+#' Four major chromatin states were identified as reported in Van Rechem et al., 2021.
 chromHMM.bed <- read.table("dat/broad.chromatin.state.bed",sep="\t")[,1:4]
 colnames(chromHMM.bed) <- c("chr","start","end","state")
 
+#' Subgroups within activate chromatin state clustered by replication timing
 target.state <- "act"
 target.state.bins <- bedtoolsr::bt.intersect(bin.bed,chromHMM.bed[chromHMM.bed$state==target.state,],wa=T)[,4]
 state.RT <- log10(RT.bin.norm[target.state.bins,c("RPE.ct1.S1","RPE.ct1.S2","RPE.ct1.S3","RPE.ct1.S4")]+0.1)
@@ -105,10 +107,11 @@ ComplexHeatmap::Heatmap(state.RT,
                         column_labels = c("S1","S2","S3","S4"),
                         cluster_row_slices=T,
                         name='log10(RPE)')
+
 #' Using cell cycle H3K36me3 ChIP-seq coverage as an example to investigate
-#' above histone modification temporal dynamics at each time point (G1, ES, LS,
-#' G2/M) through cell cycle.
-#' 
+#' histone modification temporal dynamics at each time point (G1, ES, LS,
+#' G2/M) through cell cycle in chromatin subgroups
+
 #' Load H3K36me3 and Input ChIP-seq genomic coverage were normalized as shown before
 H3K36me3.bin.cpm <- read.table("dat/H3K36me3.qn.txt",header=T,check.names = F)
 Input.bin.cpm <- read.table("dat/Input.qn.txt",header=T,check.names = F)
@@ -138,8 +141,9 @@ ComplexHeatmap::Heatmap(H3K36me3.cycle[target.state.bins,] %>% as.matrix(),
 
 #' ### Calculate Replication Timing Index (RTI) and RTI change
 #' Calculate RTI based on Repli-seq data at multiple time points across cell
-#' cycle in all samples (2 replicates of control cells and 2 replicates of
-#' over-expression cells)
+#' cycle in all samples (2 replicates of control cells and 2 replicates: CT1/CT2 of
+#' over-expression cells 4A1/4A2)
+
 calc_rt_index <- function(dat) {
   dat.norm <- dat/rowSums(dat)
   sum <- rep(0,dim(dat.norm)[1])
@@ -164,7 +168,7 @@ RTI.diff <- data.frame(bin.bed,
                        diff=RTI.diff,
                        P.value=2*pnorm(-abs(RTI.diff/RTI.rep.sd)))
 
-#' List top differential RT genomic bins
+#' Top differential RT genomic bins
 RTI.diff[order(RTI.diff$P.value),] %>% head()
 
 #' Example of a differential RT region
@@ -239,7 +243,7 @@ plot(dat_tst$diffRT, pred, ylab = "Predicted", xlab = "Observed",
 
 #' ### Define genomic regions with specific types of local replication patterns
 #' Using genome-wide RTI values calculated at the previous step, define genomic
-#' locations of initiation zones, termination sites, constant timing regions.
+#' locations of initiation zones, termination sites and constant timing regions.
 w <- 10
 var.cutoff<-1e-3
 bs <- head(bin.bed[,3]-bin.bed[,2],1)
