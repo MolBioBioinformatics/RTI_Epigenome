@@ -188,12 +188,12 @@ write.table(bedtoolsr::bt.merge(RTI.diff.bins[order(RTI.diff.bins$chr,RTI.diff.b
 
 #' ### Train and evaluate computational models to predict RTI from the
 #' combination of epigenomic and transcriptomic data
-tab.Ctrl.Broad <- as.matrix(read.table("dat/bin.Ctrl.enrich.tab",header=T)[,-(1:3)]) # Input normalized log2 enrichment of all broad histone marks in each 50Kb bin
-tab.sync.Ctrl.Broad <- as.matrix(read.table("dat/bin.sync.ctrl.enrich.tab",header=T)[,-(1:3)]) # Input normalized log2 enrichment of all broad histone marks across cell cycle
+tab.Ctrl.Broad <- as.matrix(read.table(gzfile("dat/bin.Ctrl.enrich.tab.gz"),header=T)[,-(1:3)]) # Input normalized log2 enrichment of all broad histone marks in each 50Kb bin
+tab.sync.Ctrl.Broad <- as.matrix(read.table(gzfile("dat/bin.sync.ctrl.enrich.tab.gz"),header=T)[,-(1:3)]) # Input normalized log2 enrichment of all broad histone marks across cell cycle
 
-tab.deltaBroad <- as.matrix(read.table("dat/bin.diff.broad.tab",header=T)[,-(1:3)]) # difference log2 enrichment between Ctrl and KDM4A-OE of all broad histone marks in each 50Kb bin
-tab.sync.deltaBroad <- as.matrix(read.table("dat/bin.diff.broad.cycle.tab",header=T)[,-(1:3)]) # difference log2 enrichment between Ctrl and KDM4A-OE of all broad histone marks in each 50Kb bin across cell cycle
-tab.diffPeak <- as.matrix(read.table("dat/bin.diff.peak.cnt.tab",header=T)[,-(1:3)]) # number of differential peaks between Ctrl and KDM4A-OE in each 50Kb bin
+tab.deltaBroad <- as.matrix(read.table(gzfile("dat/bin.diff.broad.tab.gz"),header=T)[,-(1:3)]) # difference log2 enrichment between Ctrl and KDM4A-OE of all broad histone marks in each 50Kb bin
+tab.sync.deltaBroad <- as.matrix(read.table(gzfile("dat/bin.diff.broad.cycle.tab.gz"),header=T)[,-(1:3)]) # difference log2 enrichment between Ctrl and KDM4A-OE of all broad histone marks in each 50Kb bin across cell cycle
+tab.diffPeak <- as.matrix(read.table(gzfile("dat/bin.diff.peak.cnt.tab.gz"),header=T)[,-(1:3)]) # number of differential peaks between Ctrl and KDM4A-OE in each 50Kb bin
 
 #' Split training and testing sets
 rand.chr.list <- sample(unique(bin.bed[,1]))
