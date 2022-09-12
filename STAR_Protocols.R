@@ -9,10 +9,14 @@ library(dplyr)
 library(circlize)
 
 #' ### Replication Timing (RT) data QC 
-#' Load Replication Timing (RT) genomic bin coverage.
-#' RT_rawCount.txt counted 
+#' Retinal pigment epithelial (RPE) cells were sorted and isolated in multiple
+#' time points during S phase (S1,S2,S3,S4) to evaluate DNA replication in both
+#' control (CT) and KDM4A over-expression (4A) cells in two replicates.
+#' 
+#' Load Replication Timing (RT) Repli-seq 50Kb genomic bin coverage
+
 # tab <- read.table("dat/RT_rawCount.txt", header=TRUE) # read text file
-tab <- read.table(gzfile("dat/RT_rawCount.txt.gz"), header=TRUE) # read .gz
+tab <- read.table(gzfile("dat/RT_rawCount.txt.gz"), header=TRUE) # read .gz file
 colnames(tab) <- gsub(".bam","",colnames(tab))
 rownames(tab) <- paste("bin",1:dim(tab)[1],sep="")
 
